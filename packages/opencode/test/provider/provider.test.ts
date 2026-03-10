@@ -5,6 +5,7 @@ import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { Provider } from "../../src/provider/provider"
 import { Env } from "../../src/env"
+import { Auth } from "../../src/auth"
 
 test("provider loaded from env variable", async () => {
   await using tmp = await tmpdir({
@@ -2276,6 +2277,103 @@ test("cloudflare-ai-gateway forwards config metadata options", async () => {
         invoked_by: "test",
         project: "opencode",
       })
+    },
+  })
+})
+
+test("google provider autoloads from GOOGLE_GENERATIVE_AI_API_KEY env var", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+        }),
+      )
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    init: async () => {
+      Env.set("GOOGLE_GENERATIVE_AI_API_KEY", "test-google-key")
+    },
+    fn: async () => {
+      const providers = await Provider.list()
+      expect(providers["google"]).toBeDefined()
+      // Env var key is forwarded to the SDK options
+      expect(providers["google"].options.apiKey).toBe("test-google-key")
+    },
+  })
+})
+
+test("google provider does not autoload without API key", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+        }),
+      )
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      // No env var and no stored auth token – provider must not appear
+      const providers = await Provider.list()
+      expect(providers["google"]).toBeUndefined()
+    },
+  })
+})
+
+test("google provider autoloads from stored auth token when env var absent", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+        }),
+      )
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    init: async () => {
+      // Store an API-type auth token for the google provider
+      await Auth.set("google", { type: "api", key: "stored-google-key" })
+    },
+    fn: async () => {
+      const providers = await Provider.list()
+      expect(providers["google"]).toBeDefined()
+      expect(providers["google"].options.apiKey).toBe("stored-google-key")
+    },
+  })
+})
+
+test("google provider env var takes precedence over stored auth token", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "opencode.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+        }),
+      )
+    },
+  })
+  await Instance.provide({
+    directory: tmp.path,
+    init: async () => {
+      Env.set("GOOGLE_GENERATIVE_AI_API_KEY", "env-key")
+      await Auth.set("google", { type: "api", key: "stored-key" })
+    },
+    fn: async () => {
+      const providers = await Provider.list()
+      expect(providers["google"]).toBeDefined()
+      // Env var wins over stored token
+      expect(providers["google"].options.apiKey).toBe("env-key")
     },
   })
 })
