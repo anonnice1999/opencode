@@ -380,6 +380,7 @@ export namespace Provider {
       }
     },
     google: async () => {
+      // API key precedence: 1) GOOGLE_GENERATIVE_AI_API_KEY env var, 2) stored auth token
       const apiKey = await (async () => {
         const env = Env.all()
         if (env["GOOGLE_GENERATIVE_AI_API_KEY"]) return env["GOOGLE_GENERATIVE_AI_API_KEY"]
@@ -388,6 +389,7 @@ export namespace Provider {
         return undefined
       })()
 
+      // Skip autoload when no API key is available
       if (!apiKey) return { autoload: false }
 
       return {
@@ -571,7 +573,7 @@ export namespace Provider {
       if (!apiToken) {
         throw new Error(
           "CLOUDFLARE_API_TOKEN (or CF_AIG_TOKEN) is required for Cloudflare AI Gateway. " +
-          "Set it via environment variable or run `opencode auth cloudflare-ai-gateway`.",
+            "Set it via environment variable or run `opencode auth cloudflare-ai-gateway`.",
         )
       }
 
@@ -744,13 +746,13 @@ export namespace Provider {
         },
         experimentalOver200K: model.cost?.context_over_200k
           ? {
-            cache: {
-              read: model.cost.context_over_200k.cache_read ?? 0,
-              write: model.cost.context_over_200k.cache_write ?? 0,
-            },
-            input: model.cost.context_over_200k.input,
-            output: model.cost.context_over_200k.output,
-          }
+              cache: {
+                read: model.cost.context_over_200k.cache_read ?? 0,
+                write: model.cost.context_over_200k.cache_write ?? 0,
+              },
+              input: model.cost.context_over_200k.input,
+              output: model.cost.context_over_200k.output,
+            }
           : undefined,
       },
       limit: {
