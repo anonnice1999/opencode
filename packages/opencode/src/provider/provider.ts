@@ -379,6 +379,30 @@ export namespace Provider {
         },
       }
     },
+    google: async () => {
+      // API key precedence: 1) GOOGLE_GENERATIVE_AI_API_KEY env var, 2) stored auth token
+      const apiKey = await (async () => {
+        const env = Env.all()
+        if (env["GOOGLE_GENERATIVE_AI_API_KEY"]) return env["GOOGLE_GENERATIVE_AI_API_KEY"]
+        const auth = await Auth.get("google")
+        if (auth?.type === "api") return auth.key
+        return undefined
+      })()
+
+      // Skip autoload when no API key is available
+      if (!apiKey) return { autoload: false }
+
+      return {
+        autoload: true,
+        options: {
+          apiKey,
+        },
+        async getModel(sdk: any, modelID: string) {
+          const id = String(modelID).trim()
+          return sdk.languageModel(id)
+        },
+      }
+    },
     "google-vertex": async (provider) => {
       const project =
         provider.options?.project ??
